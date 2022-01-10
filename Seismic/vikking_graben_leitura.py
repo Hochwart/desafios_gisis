@@ -19,7 +19,7 @@ class Seismic():
     def single_trace(self, trace):
         
         
-        fig, axs = plt.subplots(nrows= 1, ncols = 2, figsize=(8,16))
+        _, axs = plt.subplots(nrows= 1, ncols = 2, figsize=(8,16))
 
         points = np.arange(0, len(trace), 1)
         x = trace.T
@@ -36,9 +36,45 @@ class Seismic():
         plt.show()
     
     def moving_average(self, trace,x , peso):
-        ret = uniform_filter1d(trace[:x], size=peso, mode = "nearest")
+        ret = uniform_filter1d(trace[:x+1], size=peso, mode = "nearest")
         self.average = ret
-            
+    
+    def agc_rms(self, trace, gate, desired):
+        self.AGCRMS = [0]*len(trace[:241])
+        for each in range(len(trace[:241])):
+            sub = np.array_split(trace[each], len(trace[each])/(gate/4))
+            for subtrace in range(len(sub)):
+                rms = np.sqrt(
+                              np.sum(
+                                     np.square(
+                                               sub[subtrace]
+                                              )
+                                    ) 
+                                    /(len(sub[subtrace]))
+                             )
+
+                g = desired/rms
+                sub[subtrace] = sub[subtrace]*g
+            sub = np.concatenate(sub)
+            self.AGCRMS[each] = sub
+        self.AGCRMS = np.array(self.AGCRMS)
+
+    def show_seismic(self, trace, clip = 1e+1):
+        
+        vmin, vmax = -clip, clip
+
+        
+        figsize=(10, 10)
+        _, axs = plt.subplots(nrows=1, ncols=1, figsize=figsize, facecolor='w', edgecolor='k',
+                            squeeze=False,
+                            sharex=True)
+        axs = axs.ravel()
+        im = axs[0].imshow(trace[:241].T, cmap='gray', vmin=vmin, vmax=vmax)
+        plt.show()
+        
+        
+        
+
         
             
     
@@ -54,38 +90,20 @@ class Seismic():
 path = r"Seismic\seismic.segy"
 
 S = Seismic(path)
-""" S.single_trace(S.sismica.trace.raw[0]) """
-S.moving_average(S.sismica.trace.raw, 12, 7)
-""" S.single_trace(S.average[0]) """
-
-fig, axs = plt.subplots(nrows= 2, ncols = 2, figsize=(8,16))
-
-points = np.arange(0, len(S.sismica.trace.raw[0]), 1)
-x = S.sismica.trace.raw[0].T
-x = x/np.max(x)
-fig1 = axs[0][0].plot(x , points,'k', linewidth=0.7)
-axs[0][0].fill_betweenx(points, 0, x, where= x>0, color="k")
-axs[0][0].invert_yaxis()
-
-freqs = np.linspace(0, 1/0.004, len(S.sismica.trace.raw[0]))
-freq = np.fft.fft(S.sismica.trace.raw[0])
-fig2 = axs[0][1].plot(freqs, np.abs(freq)/np.max(np.abs(freq)), )
-axs[0][1].set_xlim(0, 130)
-
-points = np.arange(0, len(S.average[0]), 1)
-x = S.average[0].T
-x = x/np.max(x)
-fig3 = axs[1][0].plot(x , points,'k', linewidth=0.7)
-axs[1][0].fill_betweenx(points, 0, x, where= x>0, color="k")
-axs[1][0].invert_yaxis()
-
-freqs = np.linspace(0, 1/0.004, len(S.average[0]))
-freq = np.fft.fft(S.average[0])
-fig4 = axs[1][1].plot(freqs, np.abs(freq)/np.max(np.abs(freq)), )
-axs[1][1].set_xlim(0, 130)
+""" S.single_trace(S.sismica.trace.raw[0])
+S.moving_average(S.sismica.trace.raw, 1, 7)
+S.single_trace(S.average[0]) """
+S.agc_rms(S.sismica.trace.raw, 64, 100)
+S.single_trace(S.AGCRMS[0])
+S.show_seismic(S.sismica.trace.raw, 1e+2)
+S.show_seismic(S.AGCRMS, 1e+2)
 
 
-plt.show()
+
+
+
+
+
 
 
 
